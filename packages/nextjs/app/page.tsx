@@ -1,44 +1,42 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { IDKitWidget, ISuccessResult } from "@worldcoin/idkit";
 import type { NextPage } from "next";
-import { decodeAbiParameters } from "viem";
 import { useAccount } from "wagmi";
 import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
-import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
-const WORLD_COIN_APP_ID = "app_staging_6edbe9bc27b20867c422442bfe02c483";
+// TODO in prod this has to be handled properly, not a sensitive secret but a secret
+const WORLD_COIN_APP_ID = "app_staging_d651fcb581dbdb7eec39299d402bff5d";
 const WORLD_COIN_ACTION_ID = "user-login";
 
 const WorldCoinConnector = () => {
   const { address } = useAccount();
-  const { writeContractAsync, isPending } = useScaffoldWriteContract("WORLD_ID");
+  const [isPending, setIsPending] = useState(false);
 
   // this doesn't work, the staging connect works but then the verification fails
   // with `contract is not deployed` when testing with localhost:8545 hardhat optimism fork
   // leaving as is, will test on mainnet with proper identity later
   const onSuccess = async (result: ISuccessResult) => {
-    const unpackedProof = decodeAbiParameters([{ type: "uint256[8]" }], result.proof as `0x${string}`)[0];
-    console.log("submitting for on chain verification:", result);
-    if (!address) return;
-
+    console.log("verifying result", result);
     try {
-      const res = await writeContractAsync(
-        {
-          args: [address, BigInt(result.merkle_root), BigInt(result.nullifier_hash), unpackedProof],
-          chainId: 31337, /// hardcode for now
+      setIsPending(true);
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        body: JSON.stringify({ result, signal: address }),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-        {
-          onBlockConfirmation: txnReceipt => {
-            console.log("📦 receipt", txnReceipt);
-          },
-        },
-      );
-      console.log("on chain verification result:", res);
+      });
+      const data = await res.json();
+      console.log("proof verification result", data);
+      setIsPending(false);
     } catch (e) {
-      console.error("Error verifying with World ID", e);
+      console.error(e);
+      setIsPending(false);
     }
   };
 
