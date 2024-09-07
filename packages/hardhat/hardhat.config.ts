@@ -41,6 +41,7 @@ const config: HardhatUserConfig = {
     // View the networks that are pre-configured.
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
+      chainId: 10,
       forking: {
         url: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
       },
