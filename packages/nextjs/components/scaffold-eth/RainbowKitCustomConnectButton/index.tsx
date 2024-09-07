@@ -37,7 +37,8 @@ export const RainbowKitCustomConnectButton = () => {
                 );
               }
 
-              if (chain.unsupported || chain.id !== targetNetwork.id) {
+              if (chain.id !== targetNetwork.id) {
+                console.log(chain.id, targetNetwork.id);
                 return <WrongNetworkDropdown />;
               }
 

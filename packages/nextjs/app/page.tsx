@@ -4,30 +4,44 @@ import Link from "next/link";
 import { IDKitWidget, ISuccessResult } from "@worldcoin/idkit";
 import type { NextPage } from "next";
 import { decodeAbiParameters } from "viem";
-import { useAccount, useWalletClient } from "wagmi";
+import { useAccount } from "wagmi";
 import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
-import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+import { useScaffoldWriteContract } from "~~/hooks/scaffold-eth";
 
 const WORLD_COIN_APP_ID = "app_staging_6edbe9bc27b20867c422442bfe02c483";
 const WORLD_COIN_ACTION_ID = "user-login";
 
 const WorldCoinConnector = () => {
   const { address } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const { data: worldId } = useScaffoldContract({ contractName: "WORLD_ID", walletClient });
+  const { writeContractAsync, isPending } = useScaffoldWriteContract("WORLD_ID");
+
+  // this doesn't work, the staging connect works but then the verification fails
+  // with `contract is not deployed` when testing with localhost:8545 hardhat optimism fork
+  // leaving as is, will test on mainnet with proper identity later
   const onSuccess = async (result: ISuccessResult) => {
     const unpackedProof = decodeAbiParameters([{ type: "uint256[8]" }], result.proof as `0x${string}`)[0];
     console.log("submitting for on chain verification:", result);
-    if (!worldId || !address) return;
-    const res = await worldId.write.verifyAndExecute([
-      address,
-      BigInt(result.merkle_root),
-      BigInt(result.nullifier_hash),
-      unpackedProof,
-    ]);
-    console.log("on chain verification result:", res);
+    if (!address) return;
+
+    try {
+      const res = await writeContractAsync(
+        {
+          args: [address, BigInt(result.merkle_root), BigInt(result.nullifier_hash), unpackedProof],
+          chainId: 31337, /// hardcode for now
+        },
+        {
+          onBlockConfirmation: txnReceipt => {
+            console.log("📦 receipt", txnReceipt);
+          },
+        },
+      );
+      console.log("on chain verification result:", res);
+    } catch (e) {
+      console.error("Error verifying with World ID", e);
+    }
   };
+
   return (
     <IDKitWidget
       app_id={WORLD_COIN_APP_ID}
@@ -36,7 +50,11 @@ const WorldCoinConnector = () => {
       onSuccess={onSuccess}
       autoClose={true}
     >
-      {({ open }) => <button onClick={open}>Verify with World ID</button>}
+      {({ open }) => (
+        <button onClick={open} disabled={isPending}>
+          {isPending ? "Verifying..." : "Verify with World ID"}
+        </button>
+      )}
     </IDKitWidget>
   );
 };

@@ -30,7 +30,7 @@ const config: HardhatUserConfig = {
       },
     },
   },
-  defaultNetwork: "localhost",
+  defaultNetwork: "hardhat",
   namedAccounts: {
     deployer: {
       // By default, it will take the first Hardhat account as the deployer
@@ -41,9 +41,9 @@ const config: HardhatUserConfig = {
     // View the networks that are pre-configured.
     // If the network you are looking for is not here you can add new network settings
     hardhat: {
-      chainId: 10,
       forking: {
         url: `https://opt-mainnet.g.alchemy.com/v2/${providerApiKey}`,
+        enabled: true,
       },
     },
     // mainnet: {
