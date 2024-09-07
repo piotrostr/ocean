@@ -1,10 +1,45 @@
 "use client";
 
 import Link from "next/link";
+import { IDKitWidget, ISuccessResult } from "@worldcoin/idkit";
 import type { NextPage } from "next";
-import { useAccount } from "wagmi";
+import { decodeAbiParameters } from "viem";
+import { useAccount, useWalletClient } from "wagmi";
 import { BugAntIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 import { Address } from "~~/components/scaffold-eth";
+import { useScaffoldContract } from "~~/hooks/scaffold-eth";
+
+const WORLD_COIN_APP_ID = "app_staging_6edbe9bc27b20867c422442bfe02c483";
+const WORLD_COIN_ACTION_ID = "user-login";
+
+const WorldCoinConnector = () => {
+  const { address } = useAccount();
+  const { data: walletClient } = useWalletClient();
+  const { data: worldId } = useScaffoldContract({ contractName: "WORLD_ID", walletClient });
+  const onSuccess = async (result: ISuccessResult) => {
+    const unpackedProof = decodeAbiParameters([{ type: "uint256[8]" }], result.proof as `0x${string}`)[0];
+    console.log("submitting for on chain verification:", result);
+    if (!worldId || !address) return;
+    const res = await worldId.write.verifyAndExecute([
+      address,
+      BigInt(result.merkle_root),
+      BigInt(result.nullifier_hash),
+      unpackedProof,
+    ]);
+    console.log("on chain verification result:", res);
+  };
+  return (
+    <IDKitWidget
+      app_id={WORLD_COIN_APP_ID}
+      action={WORLD_COIN_ACTION_ID}
+      signal={address}
+      onSuccess={onSuccess}
+      autoClose={true}
+    >
+      {({ open }) => <button onClick={open}>Verify with World ID</button>}
+    </IDKitWidget>
+  );
+};
 
 const Home: NextPage = () => {
   const { address: connectedAddress } = useAccount();
@@ -17,6 +52,7 @@ const Home: NextPage = () => {
             <span className="block text-2xl mb-2">Welcome to</span>
             <span className="block text-4xl font-bold">Scaffold-ETH 2</span>
           </h1>
+          <WorldCoinConnector />
           <div className="flex justify-center items-center space-x-2 flex-col sm:flex-row">
             <p className="my-2 font-medium">Connected Address:</p>
             <Address address={connectedAddress} />
